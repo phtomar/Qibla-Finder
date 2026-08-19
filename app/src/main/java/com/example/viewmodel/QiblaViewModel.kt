@@ -4,8 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.HapticFeedbackHelper
+import com.example.data.PreferencesManager
 import com.example.location.LocationHelper
+import com.example.model.AppLanguage
 import com.example.model.AppPreferences
+import com.example.model.AppThemeId
 import com.example.model.CalculationMethod
 import com.example.model.CompassReading
 import com.example.model.JuristicMethod
@@ -15,6 +18,7 @@ import com.example.model.QiblaInfo
 import com.example.model.QiblaUiState
 import com.example.sensors.CompassSensorManager
 import com.example.util.QiblaMath
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,33 +31,61 @@ import kotlin.math.roundToInt
 
 class QiblaViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val preferencesManager = PreferencesManager(application)
     private val sensorManager = CompassSensorManager(application)
     private val locationHelper = LocationHelper(application)
     private val hapticHelper = HapticFeedbackHelper(application)
 
-    private val _uiState = MutableStateFlow(QiblaUiState())
+    private val initialPreferences = preferencesManager.loadPreferences()
+    private val _uiState = MutableStateFlow(QiblaUiState(preferences = initialPreferences))
     val uiState: StateFlow<QiblaUiState> = _uiState.asStateFlow()
 
+    private var sensorJob: Job? = null
     private var wasAlignedLastFrame = false
     private var lastAlignedTimeMs = 0L
+    private var hasAutoPromptedCalibration = false
 
     init {
-        // Start listening to compass sensors
-        observeSensors()
+        // Start listening to compass sensors initially
+        startSensors()
 
-        // Set default location (Cairo or Mecca fallback or preset)
-        val defaultCity = QiblaMath.PRESET_CITIES.firstOrNull { it.name == "Cairo" }
-            ?: QiblaMath.PRESET_CITIES.firstOrNull { it.name == "Mecca" }
-            ?: QiblaMath.PRESET_CITIES[0]
-        selectCity(defaultCity)
+        // Check if user has selected language on first install
+        if (!preferencesManager.hasChosenLanguage()) {
+            _uiState.update { it.copy(showLanguagePrompt = true) }
+        }
+
+        // Load saved location or fallback to Cairo / Mecca
+        val savedLocation = preferencesManager.loadLastLocation()
+        if (savedLocation != null) {
+            applyNewLocation(savedLocation)
+        } else {
+            val defaultCity = QiblaMath.PRESET_CITIES.firstOrNull { it.name == "Cairo" }
+                ?: QiblaMath.PRESET_CITIES.firstOrNull { it.name == "Mecca" }
+                ?: QiblaMath.PRESET_CITIES[0]
+            selectCity(defaultCity)
+        }
     }
 
-    private fun observeSensors() {
-        viewModelScope.launch {
+    /**
+     * Resumes compass sensor sampling when the app is active in foreground.
+     */
+    fun startSensors() {
+        if (sensorJob?.isActive == true) return
+        sensorJob = viewModelScope.launch {
             sensorManager.getCompassOrientationFlow().collect { reading ->
                 processSensorReading(reading)
             }
         }
+    }
+
+    /**
+     * Pauses sensor sampling and detaches hardware listeners when app is in background,
+     * completely eliminating background beeps and saving battery.
+     */
+    fun stopSensors() {
+        sensorJob?.cancel()
+        sensorJob = null
+        wasAlignedLastFrame = false
     }
 
     fun onLocationPermissionGranted() {
@@ -109,6 +141,8 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun applyNewLocation(location: LocationData) {
+        preferencesManager.saveLastLocation(location)
+
         val qiblaBearing = QiblaMath.calculateQiblaBearing(location.latitude, location.longitude)
         val distanceKm = QiblaMath.calculateDistanceKm(location.latitude, location.longitude)
         val distanceMiles = QiblaMath.kmToMiles(distanceKm)
@@ -156,17 +190,26 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
             // Trigger feedback on alignment transition
             checkAlignmentFeedback(updatedQibla.isAligned, state.preferences)
 
+            // Auto-prompt calibration popup if sensor precision is low/unreliable
+            val shouldAutoPromptCalibration = !hasAutoPromptedCalibration &&
+                (reading.accuracy == com.example.model.SensorAccuracy.UNRELIABLE || reading.accuracy == com.example.model.SensorAccuracy.LOW)
+
+            if (shouldAutoPromptCalibration) {
+                hasAutoPromptedCalibration = true
+            }
+
             val statusMsg = when {
-                !reading.isLevel -> "Hold phone flat on your palm for best precision"
-                updatedQibla.isAligned -> "Aligned with Kaaba! (🕋 Qibla Found)"
-                updatedQibla.relativeAngle > 3f -> "Turn ${abs(updatedQibla.relativeAngle).roundToInt()}° Right ➔"
-                updatedQibla.relativeAngle < -3f -> "Turn ${abs(updatedQibla.relativeAngle).roundToInt()}° Left ⬅"
-                else -> "Point phone towards the Kaaba"
+                !reading.isLevel -> "Hold phone flat"
+                updatedQibla.isAligned -> "Aligned with Kaaba! 🕋"
+                updatedQibla.relativeAngle > 3f -> "Turn Right ➔"
+                updatedQibla.relativeAngle < -3f -> "Turn Left ⬅"
+                else -> "Point to Kaaba"
             }
 
             state.copy(
                 compass = reading,
                 qibla = updatedQibla,
+                showCalibrationDialog = if (shouldAutoPromptCalibration) true else state.showCalibrationDialog,
                 statusMessage = statusMsg
             )
         }
@@ -221,13 +264,16 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
     private fun updatePrayerSchedule() {
         val state = _uiState.value
         val loc = state.location
+        val isArabic = state.preferences.language == AppLanguage.ARABIC
         val schedule = QiblaMath.calculatePrayerTimes(
             latitude = loc.latitude,
             longitude = loc.longitude,
             calendar = Calendar.getInstance(),
             timeZone = TimeZone.getDefault(),
             method = state.preferences.calculationMethod,
-            juristicMethod = state.preferences.juristicMethod
+            juristicMethod = state.preferences.juristicMethod,
+            is24Hour = state.preferences.use24HourFormat,
+            isArabic = isArabic
         )
         _uiState.update { it.copy(prayerSchedule = schedule) }
     }
@@ -249,7 +295,12 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showSettings = show) }
     }
 
+    fun toggleTasbih(show: Boolean) {
+        _uiState.update { it.copy(showTasbih = show) }
+    }
+
     fun setCalculationMethod(method: CalculationMethod) {
+        preferencesManager.saveCalculationMethod(method, autoDetect = false)
         _uiState.update {
             it.copy(
                 preferences = it.preferences.copy(
@@ -262,12 +313,14 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setAutoDetectCalculationMethod(autoDetect: Boolean) {
+        val currentLoc = _uiState.value.location
+        val updatedMethod = if (autoDetect) {
+            CalculationMethod.detectBestMethod(currentLoc.countryName, currentLoc.cityName)
+        } else {
+            _uiState.value.preferences.calculationMethod
+        }
+        preferencesManager.saveCalculationMethod(updatedMethod, autoDetect = autoDetect)
         _uiState.update { state ->
-            val updatedMethod = if (autoDetect) {
-                CalculationMethod.detectBestMethod(state.location.countryName, state.location.cityName)
-            } else {
-                state.preferences.calculationMethod
-            }
             state.copy(
                 preferences = state.preferences.copy(
                     autoDetectCalculationMethod = autoDetect,
@@ -279,6 +332,7 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setJuristicMethod(juristicMethod: JuristicMethod) {
+        preferencesManager.saveJuristicMethod(juristicMethod)
         _uiState.update {
             it.copy(preferences = it.preferences.copy(juristicMethod = juristicMethod))
         }
@@ -286,32 +340,63 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setTrueNorth(enabled: Boolean) {
+        preferencesManager.saveTrueNorth(enabled)
         _uiState.update { it.copy(preferences = it.preferences.copy(useTrueNorth = enabled)) }
         processSensorReading(_uiState.value.compass)
     }
 
     fun setHapticsEnabled(enabled: Boolean) {
+        preferencesManager.saveHapticsEnabled(enabled)
         _uiState.update { it.copy(preferences = it.preferences.copy(hapticsEnabled = enabled)) }
     }
 
     fun setSoundEnabled(enabled: Boolean) {
+        preferencesManager.saveSoundEnabled(enabled)
         _uiState.update { it.copy(preferences = it.preferences.copy(soundEnabled = enabled)) }
     }
 
     fun setDialRotationMode(dialMode: Boolean) {
+        preferencesManager.saveDialRotationMode(dialMode)
         _uiState.update { it.copy(preferences = it.preferences.copy(dialRotationMode = dialMode)) }
     }
 
     fun setUseKilometers(useKm: Boolean) {
+        preferencesManager.saveUseKilometers(useKm)
         _uiState.update { it.copy(preferences = it.preferences.copy(useKilometers = useKm)) }
     }
 
-    fun setTheme(themeId: com.example.model.AppThemeId) {
+    fun setUse24HourFormat(use24Hour: Boolean) {
+        preferencesManager.saveUse24HourFormat(use24Hour)
+        _uiState.update { it.copy(preferences = it.preferences.copy(use24HourFormat = use24Hour)) }
+        updatePrayerSchedule()
+    }
+
+    fun setTheme(themeId: AppThemeId) {
+        preferencesManager.saveTheme(themeId)
         _uiState.update { it.copy(preferences = it.preferences.copy(themeId = themeId)) }
     }
 
-    fun setLanguage(language: com.example.model.AppLanguage) {
+    fun setLanguage(language: AppLanguage) {
+        preferencesManager.saveLanguage(language)
         _uiState.update { it.copy(preferences = it.preferences.copy(language = language)) }
+        updatePrayerSchedule()
+    }
+
+    fun selectInitialLanguage(language: AppLanguage) {
+        preferencesManager.saveLanguage(language)
+        preferencesManager.setChosenLanguage(true)
+        _uiState.update {
+            it.copy(
+                preferences = it.preferences.copy(language = language, hasChosenLanguage = true),
+                showLanguagePrompt = false
+            )
+        }
+        updatePrayerSchedule()
+    }
+
+    fun closeLanguagePrompt() {
+        preferencesManager.setChosenLanguage(true)
+        _uiState.update { it.copy(showLanguagePrompt = false) }
     }
 
     fun toggleNearbyMosques(show: Boolean) {
@@ -320,6 +405,7 @@ class QiblaViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        stopSensors()
         hapticHelper.release()
     }
 }

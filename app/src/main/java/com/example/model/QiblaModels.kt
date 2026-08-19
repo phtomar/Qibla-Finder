@@ -169,47 +169,47 @@ enum class AppThemeId(
 ) {
     // 3 Light Themes
     GEOMETRIC_LIGHT(
-        displayName = "Geometric Amethyst",
-        displayNameAr = "الأرجواني الهندسي",
-        subtitle = "Royal purple with serene alabaster canvas",
-        subtitleAr = "بنفسجي ملكي مع خلفية مرمرية ناعمة",
+        displayName = "Amethyst",
+        displayNameAr = "أرجواني",
+        subtitle = "Royal purple with alabaster canvas",
+        subtitleAr = "بنفسجي ملكي هادئ",
         isDark = false
     ),
     EMERALD_LIGHT(
-        displayName = "Emerald Oasis",
-        displayNameAr = "واحة الزمرد",
-        subtitle = "Sacred Islamic green with mint accents",
-        subtitleAr = "أخضر إسلامي مقدس مع لمسات نعناعية",
+        displayName = "Oasis",
+        displayNameAr = "واحة",
+        subtitle = "Lush Islamic green & mint",
+        subtitleAr = "أخضر إسلامي يانع",
         isDark = false
     ),
     SANDSTONE_LIGHT(
-        displayName = "Desert Sandstone",
-        displayNameAr = "حجر الصحراء الرملي",
-        subtitle = "Warm terracotta & Makkah limestone",
-        subtitleAr = "طين دافئ وحجر مكة المكرمة العريق",
+        displayName = "Amber Dune",
+        displayNameAr = "عنبر",
+        subtitle = "Warm desert terracotta & gold",
+        subtitleAr = "رمال العنبر والذهب",
         isDark = false
     ),
 
     // 3 Dark Themes
     MIDNIGHT_KAABA(
-        displayName = "Midnight Kaaba",
-        displayNameAr = "سواد الكعبة المشرفة",
-        subtitle = "Deep obsidian with Kiswah gold accents",
-        subtitleAr = "سواد ناصع مع ذهب كسوة الكعبة المشرفة",
+        displayName = "Kiswah Gold",
+        displayNameAr = "كسوة",
+        subtitle = "Obsidian with pure Kiswah gold",
+        subtitleAr = "سواد ناصع بذهب الكسوة",
         isDark = true
     ),
     ROYAL_CELESTIAL(
-        displayName = "Royal Celestial",
-        displayNameAr = "السماء الملكية",
-        subtitle = "Deep cosmic indigo with luminous lilac",
-        subtitleAr = "نيلي كوني داكن مع إضاءة ليلكية ساحرة",
+        displayName = "Celestial",
+        displayNameAr = "فلكي",
+        subtitle = "Cosmic indigo & neon lilac",
+        subtitleAr = "أزرق كوني وليلك",
         isDark = true
     ),
     ARABIAN_NIGHT(
-        displayName = "Arabian Night",
-        displayNameAr = "ليالي عربية",
-        subtitle = "Malachite night with luminous mint jade",
-        subtitleAr = "ليل ملاكيت عميق مع يشم نعناعي مضيء",
+        displayName = "Malachite",
+        displayNameAr = "ملاكيت",
+        subtitle = "High-contrast emerald & luminous mint",
+        subtitleAr = "زمرد ملكيت عالي التباين",
         isDark = true
     )
 }
@@ -262,11 +262,13 @@ data class AppPreferences(
     val soundEnabled: Boolean = true,
     val dialRotationMode: Boolean = true,
     val useKilometers: Boolean = true,
+    val use24HourFormat: Boolean = false,
     val calculationMethod: CalculationMethod = CalculationMethod.EGYPTIAN,
     val autoDetectCalculationMethod: Boolean = true,
     val juristicMethod: JuristicMethod = JuristicMethod.STANDARD,
-    val themeId: AppThemeId = AppThemeId.GEOMETRIC_LIGHT,
-    val language: AppLanguage = AppLanguage.ENGLISH
+    val themeId: AppThemeId = AppThemeId.SANDSTONE_LIGHT,
+    val language: AppLanguage = AppLanguage.ENGLISH,
+    val hasChosenLanguage: Boolean = false
 )
 
 /**
@@ -284,6 +286,8 @@ data class QiblaUiState(
     val showPrayerTimes: Boolean = false,
     val showSettings: Boolean = false,
     val showNearbyMosques: Boolean = false,
+    val showTasbih: Boolean = false,
+    val showLanguagePrompt: Boolean = false,
     val hasLocationPermission: Boolean = false,
-    val statusMessage: String = "Point your phone towards the Kaaba"
+    val statusMessage: String = "Point phone towards the Kaaba"
 )

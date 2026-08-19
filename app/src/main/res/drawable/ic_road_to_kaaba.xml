@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Horizon line -->
+  <path
+      android:pathData="M3,11 L21,11"
+      android:strokeWidth="1.2"
+      android:strokeColor="#FFFFFF"
+      android:strokeAlpha="0.4"
+      android:strokeLineCap="round"/>
+  <!-- Perspective Road Left Edge -->
+  <path
+      android:pathData="M4,22 L10,11"
+      android:strokeWidth="1.8"
+      android:strokeColor="#FFFFFF"
+      android:strokeLineCap="round"/>
+  <!-- Perspective Road Right Edge -->
+  <path
+      android:pathData="M20,22 L14,11"
+      android:strokeWidth="1.8"
+      android:strokeColor="#FFFFFF"
+      android:strokeLineCap="round"/>
+  <!-- Road Center Dashed Line -->
+  <path
+      android:pathData="M12,21 L12,18 M12,15 L12,12.5"
+      android:strokeWidth="1.4"
+      android:strokeColor="#FFFFFF"
+      android:strokeLineCap="round"/>
+  <!-- Kaaba Base Cube at the End of the Road -->
+  <path
+      android:pathData="M8.5,4.5 L15.5,4.5 L15.5,10.5 L8.5,10.5 Z"
+      android:fillColor="#1A1A1A"
+      android:strokeWidth="1.2"
+      android:strokeColor="#FFD54F"/>
+  <!-- Kiswah Gold Band -->
+  <path
+      android:pathData="M8.5,6.2 L15.5,6.2"
+      android:strokeWidth="1.2"
+      android:strokeColor="#FFD54F"/>
+  <!-- Bab Al-Kaaba Door -->
+  <path
+      android:pathData="M12.2,7.8 L14.2,7.8 L14.2,10.5 L12.2,10.5 Z"
+      android:fillColor="#FFD54F"/>
+</vector>

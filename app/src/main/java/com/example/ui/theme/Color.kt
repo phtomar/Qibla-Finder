@@ -181,31 +181,31 @@ val PaletteRoyalCelestial = AppThemePalette(
     goldAccent = Color(0xFFE8C557)
 )
 
-// 6. Arabian Night (Malachite Night & Luminous Mint Dark)
+// 6. Arabian Night (Malachite Night & High-Contrast Luminous Emerald Dark)
 val PaletteArabianNight = AppThemePalette(
     id = AppThemeId.ARABIAN_NIGHT,
     isDark = true,
-    background = Color(0xFF06130D),
-    surface = Color(0xFF0D2218),
-    surfaceVariant = Color(0xFF143324),
-    container = Color(0xFF1D4532),
-    containerHigh = Color(0xFF245B42),
-    onContainerHigh = Color(0xFFB4F7D3),
-    primary = Color(0xFF56DCA4),
-    primaryDark = Color(0xFF32BA82),
-    secondary = Color(0xFFB2CCBE),
-    tertiary = Color(0xFFA5CDDE),
-    border = Color(0xFF28543E),
-    borderSubtle = Color(0xFF183A2A),
-    dashedGuide = Color(0xFF487D63),
-    textPrimary = Color(0xFFE4F8EE),
-    textSecondary = Color(0xFF8DB29F),
-    textMuted = Color(0xFF5F8572),
-    north = Color(0xFF56DCA4),
-    cardinal = Color(0xFF8DB29F),
-    centerHub = Color(0xFF1A402E),
-    kaabaBadge = Color(0xFF56DCA4),
-    goldAccent = Color(0xFFE6C556)
+    background = Color(0xFF071810),
+    surface = Color(0xFF0E281C),
+    surfaceVariant = Color(0xFF163C2B),
+    container = Color(0xFF1D523A),
+    containerHigh = Color(0xFF236A4B),
+    onContainerHigh = Color(0xFFE8FFF3),
+    primary = Color(0xFF38EF9E),
+    primaryDark = Color(0xFF12D478),
+    secondary = Color(0xFFD8EFE3),
+    tertiary = Color(0xFFB9E8FA),
+    border = Color(0xFF3D7A5B),
+    borderSubtle = Color(0xFF26543D),
+    dashedGuide = Color(0xFF6BAF8C),
+    textPrimary = Color(0xFFFFFFFF),
+    textSecondary = Color(0xFFC0E7D4),
+    textMuted = Color(0xFF86B8A0),
+    north = Color(0xFF38EF9E),
+    cardinal = Color(0xFFD8EFE3),
+    centerHub = Color(0xFF133624),
+    kaabaBadge = Color(0xFF38EF9E),
+    goldAccent = Color(0xFFFFD54F)
 )
 
 fun getThemePalette(id: AppThemeId): AppThemePalette = when (id) {
@@ -319,6 +319,11 @@ val GeoKaabaBadge: Color
     @Composable
     @ReadOnlyComposable
     get() = LocalAppTheme.current.kaabaBadge
+
+val GeoGold: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalAppTheme.current.goldAccent
 
 val GeoSuccess: Color
     @Composable

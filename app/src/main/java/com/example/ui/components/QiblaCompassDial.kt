@@ -13,11 +13,23 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,14 +54,18 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.model.CompassReading
 import com.example.model.QiblaInfo
 import com.example.ui.theme.AppThemePalette
 import com.example.ui.theme.LocalAppTheme
 import com.example.util.QiblaMath
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -107,6 +123,9 @@ fun QiblaCompassDial(
         label = "qibla_bearing_anim"
     )
 
+    // Relative angle for the guidance needle
+    val relativeAngle = animatedQiblaBearing - animatedHeading
+
     // Pulse animation when aligned with Kaaba
     val infiniteTransition = rememberInfiniteTransition(label = "geo_pulse")
     val pulseGlow by infiniteTransition.animateFloat(
@@ -119,126 +138,172 @@ fun QiblaCompassDial(
         label = "pulse"
     )
 
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .padding(12.dp)
-            .shadow(
-                14.dp,
-                CircleShape,
-                spotColor = if (qibla.isAligned) theme.primary.copy(alpha = 0.5f) else theme.border.copy(alpha = 0.3f)
-            )
-            .clip(CircleShape)
-            .background(theme.surface)
-            .border(12.dp, theme.surfaceVariant, CircleShape)
-            .testTag("qibla_compass_dial"),
-        contentAlignment = Alignment.Center
+    val headingCardinal = QiblaMath.getCardinalDirection(effectiveHeading.toDouble())
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Canvas(
+        // OUTSIDE OF DIAL: Clean Device Heading Pill
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp)
+                .shadow(2.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(theme.surfaceVariant)
+                .border(1.dp, if (qibla.isAligned) theme.primary.copy(alpha = 0.6f) else theme.borderSubtle, RoundedCornerShape(16.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .testTag("dial_outside_heading")
         ) {
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = min(size.width, size.height) / 2f - 4.dp.toPx()
-            val ringRadius = radius * 0.85f
-
-            // 1. Outer dashed guide ring
-            drawDashedGuideRing(center, radius * 0.95f, theme)
-
-            // 2. Main inner ring
-            drawCircle(
-                color = if (qibla.isAligned) theme.primary.copy(alpha = 0.6f) else theme.border,
-                radius = ringRadius,
-                center = center,
-                style = Stroke(width = if (qibla.isAligned) 2.dp.toPx() else 1.2.dp.toPx())
-            )
-
-            // 3. Alignment ambient radiance
-            if (qibla.isAligned) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            theme.containerHigh.copy(alpha = 0.55f * pulseGlow),
-                            theme.container.copy(alpha = 0.2f * pulseGlow),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = radius
-                    ),
-                    radius = radius,
-                    center = center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Navigation,
+                    contentDescription = null,
+                    tint = if (qibla.isAligned) theme.primary else theme.secondary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = String.format(Locale.getDefault(), "%d° %s", effectiveHeading.roundToInt(), headingCardinal),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (qibla.isAligned) theme.primary else theme.textPrimary,
+                    letterSpacing = 0.5.sp
                 )
             }
+        }
 
-            if (dialRotationMode) {
-                // =========================================================================
-                // ROTATING DIAL MODE (Standard Qibla navigation)
-                // Compass Rose rotates with effective device heading.
-                // Both the Kaaba Badge and the Needle are placed at exact same animatedQiblaBearing.
-                // This guarantees ZERO OFFSET between the needle and the Kaaba badge.
-                // =========================================================================
-                rotate(-animatedHeading, pivot = center) {
-                    // Rose ticks and N, E, S, W
-                    drawDegreeTicks(center, ringRadius, theme)
-                    drawGeometricCardinals(center, ringRadius, theme)
+        Spacer(modifier = Modifier.height(8.dp))
 
-                    // Guidance needle extending from center directly toward the Kaaba badge
-                    rotate(animatedQiblaBearing, pivot = center) {
+        // Main Compass Dial Container
+        Box(
+            modifier = Modifier
+                .aspectRatio(1f)
+                .padding(8.dp)
+                .shadow(
+                    14.dp,
+                    CircleShape,
+                    spotColor = if (qibla.isAligned) theme.primary.copy(alpha = 0.5f) else theme.border.copy(alpha = 0.3f)
+                )
+                .clip(CircleShape)
+                .background(theme.surface)
+                .border(12.dp, theme.surfaceVariant, CircleShape)
+                .testTag("qibla_compass_dial"),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            ) {
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val radius = min(size.width, size.height) / 2f - 4.dp.toPx()
+                val ringRadius = radius * 0.85f
+
+                // 1. Outer dashed guide ring
+                drawDashedGuideRing(center, radius * 0.95f, theme)
+
+                // 2. Main inner ring
+                drawCircle(
+                    color = if (qibla.isAligned) theme.primary.copy(alpha = 0.6f) else theme.border,
+                    radius = ringRadius,
+                    center = center,
+                    style = Stroke(width = if (qibla.isAligned) 2.dp.toPx() else 1.2.dp.toPx())
+                )
+
+                // 3. Alignment ambient radiance
+                if (qibla.isAligned) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                theme.containerHigh.copy(alpha = 0.55f * pulseGlow),
+                                theme.container.copy(alpha = 0.2f * pulseGlow),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = radius
+                        ),
+                        radius = radius,
+                        center = center
+                    )
+                }
+
+                if (dialRotationMode) {
+                    // =========================================================================
+                    // ROTATING DIAL MODE:
+                    // 1. Compass Rose (ticks, N, E, S, W) rotates with -animatedHeading.
+                    // 2. Kaaba Icon is fixed at the TOP of the dial (12 o'clock / 0°).
+                    // 3. Central Pointer Needle rotates dynamically with relative angle:
+                    //    (animatedQiblaBearing - animatedHeading).
+                    //    When facing the Qibla, relative angle = 0°, so needle points straight UP
+                    //    into the Kaaba icon at the top!
+                    // =========================================================================
+                    // Rotating Rose
+                    rotate(-animatedHeading, pivot = center) {
+                        drawDegreeTicks(center, ringRadius, theme)
+                        drawGeometricCardinals(center, ringRadius, theme)
+                    }
+
+                    // Guidance needle rotating towards the relative angle
+                    rotate(relativeAngle, pivot = center) {
                         drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
                     }
 
-                    // Destination: Kaaba Marker badge at exact same azimuth on the ring
+                    // Top indicator drawn first in background
+                    drawTopIndicator(center, ringRadius, qibla.isAligned, theme)
+
+                    // Kaaba Marker Badge drawn on top covering the triangle tip
                     drawKaabaMarkerBadge(
                         center = center,
                         ringRadius = ringRadius,
-                        bearingDeg = animatedQiblaBearing,
+                        bearingDeg = 0f,
+                        isAligned = qibla.isAligned,
+                        pulseGlow = pulseGlow,
+                        theme = theme
+                    )
+                } else {
+                    // =========================================================================
+                    // FIXED DIAL MODE:
+                    // 1. Compass Rose is FIXED with North at 12 o'clock.
+                    // 2. Kaaba is fixed at the TOP (12 o'clock / 0°).
+                    // 3. Central Pointer Needle moves dynamically:
+                    //    Points directly in the direction of the Kaaba (relativeAngle = animatedQiblaBearing - animatedHeading)
+                    //    So when aligned with the Qibla, needle points straight UP to the Kaaba at the top!
+                    // =========================================================================
+                    // Fixed Compass Rose
+                    drawDegreeTicks(center, ringRadius, theme)
+                    drawGeometricCardinals(center, ringRadius, theme)
+
+                    // Guidance Needle rotating dynamically to point to the Kaaba
+                    rotate(relativeAngle, pivot = center) {
+                        drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
+                    }
+
+                    // Fixed Top Reference indicator drawn first
+                    drawTopIndicator(center, ringRadius, qibla.isAligned, theme)
+
+                    // Kaaba Marker at top (0°) covering the indicator
+                    drawKaabaMarkerBadge(
+                        center = center,
+                        ringRadius = ringRadius,
+                        bearingDeg = 0f,
                         isAligned = qibla.isAligned,
                         pulseGlow = pulseGlow,
                         theme = theme
                     )
                 }
 
-                // Top fixed heading indicator (phone forward direction at 12 o'clock)
-                drawTopIndicator(center, ringRadius, qibla.isAligned, theme)
-            } else {
-                // =========================================================================
-                // FIXED DIAL MODE
-                // Compass Rose is fixed with North at 12 o'clock; Kaaba is at its geographic azimuth.
-                // Guidance needle points directly at Kaaba badge at animatedQiblaBearing.
-                // =========================================================================
-                // 1. Compass Rose (Fixed: N at 12 o'clock, E at 3 o'clock, S at 6 o'clock, W at 9 o'clock)
-                drawDegreeTicks(center, ringRadius, theme)
-                drawGeometricCardinals(center, ringRadius, theme)
-
-                // 2. Guidance Needle pointing directly at Kaaba badge
-                rotate(animatedQiblaBearing, pivot = center) {
-                    drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
-                }
-
-                // 3. Kaaba Marker on the ring at its exact geographic azimuth
-                drawKaabaMarkerBadge(
+                // 4. Central Hub with Inclinometer / Spirit Level Bubble
+                drawGeometricCenterHub(
                     center = center,
-                    ringRadius = ringRadius,
-                    bearingDeg = animatedQiblaBearing,
+                    pitch = compass.pitch,
+                    roll = compass.roll,
+                    isLevel = compass.isLevel,
                     isAligned = qibla.isAligned,
-                    pulseGlow = pulseGlow,
                     theme = theme
                 )
-
-                // 4. Pointer indicator showing device forward heading around fixed rose
-                drawPhoneHeadingPointer(center, ringRadius, animatedHeading, qibla.isAligned, theme)
             }
-
-            // 4. Central Hub with Inclinometer / Spirit Level Bubble
-            drawGeometricCenterHub(
-                center = center,
-                pitch = compass.pitch,
-                roll = compass.roll,
-                isLevel = compass.isLevel,
-                isAligned = qibla.isAligned,
-                theme = theme
-            )
         }
     }
 }
@@ -456,24 +521,6 @@ private fun DrawScope.drawTopIndicator(
         path = path,
         color = if (isAligned) theme.primary else theme.secondary,
         style = Fill
-    )
-}
-
-private fun DrawScope.drawPhoneHeadingPointer(
-    center: Offset,
-    ringRadius: Float,
-    headingDeg: Float,
-    isAligned: Boolean,
-    theme: AppThemePalette
-) {
-    val angleRad = Math.toRadians(headingDeg.toDouble() - 90.0)
-    val markerX = center.x + ringRadius * cos(angleRad).toFloat()
-    val markerY = center.y + ringRadius * sin(angleRad).toFloat()
-
-    drawCircle(
-        color = if (isAligned) theme.primary else theme.secondary,
-        radius = 5.dp.toPx(),
-        center = Offset(markerX, markerY)
     )
 }
 

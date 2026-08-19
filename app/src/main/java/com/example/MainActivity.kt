@@ -36,4 +36,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.startSensors()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        viewModel.stopSensors()
+    }
 }

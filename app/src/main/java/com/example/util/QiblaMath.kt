@@ -139,7 +139,9 @@ object QiblaMath {
         calendar: Calendar = Calendar.getInstance(),
         timeZone: TimeZone = TimeZone.getDefault(),
         method: com.example.model.CalculationMethod = com.example.model.CalculationMethod.EGYPTIAN,
-        juristicMethod: com.example.model.JuristicMethod = com.example.model.JuristicMethod.STANDARD
+        juristicMethod: com.example.model.JuristicMethod = com.example.model.JuristicMethod.STANDARD,
+        is24Hour: Boolean = false,
+        isArabic: Boolean = false
     ): PrayerSchedule {
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH) + 1
@@ -186,12 +188,12 @@ object QiblaMath {
             computeSunHour(solarNoon, latRad, declination, method.ishaAngle, false)
         }
 
-        val fajrStr = formatTimeHour(fajrHour)
-        val sunriseStr = formatTimeHour(sunriseHour)
-        val dhuhrStr = formatTimeHour(dhuhrHour)
-        val asrStr = formatTimeHour(asrHour)
-        val maghribStr = formatTimeHour(maghribHour)
-        val ishaStr = formatTimeHour(ishaHour)
+        val fajrStr = formatTimeHour(fajrHour, is24Hour, isArabic)
+        val sunriseStr = formatTimeHour(sunriseHour, is24Hour, isArabic)
+        val dhuhrStr = formatTimeHour(dhuhrHour, is24Hour, isArabic)
+        val asrStr = formatTimeHour(asrHour, is24Hour, isArabic)
+        val maghribStr = formatTimeHour(maghribHour, is24Hour, isArabic)
+        val ishaStr = formatTimeHour(ishaHour, is24Hour, isArabic)
 
         // Determine next prayer and time remaining
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY) + calendar.get(Calendar.MINUTE) / 60.0 + calendar.get(Calendar.SECOND) / 3600.0
@@ -257,13 +259,28 @@ object QiblaMath {
         return noon + hourAngle
     }
 
-    private fun formatTimeHour(time: Double): String {
+    fun formatTimeHour(time: Double, is24Hour: Boolean = false, isArabic: Boolean = false): String {
         var normalized = time % 24.0
         if (normalized < 0) normalized += 24.0
-        val hours = normalized.toInt()
-        val minutes = ((normalized - hours) * 60).roundToInt() % 60
-        val adjustedHours = if (minutes == 0 && (normalized - hours) * 60 >= 59.5) (hours + 1) % 24 else hours
-        return String.format(Locale.getDefault(), "%02d:%02d", adjustedHours, minutes)
+        val totalMinutes = (normalized * 60).roundToInt()
+        val hours24 = (totalMinutes / 60) % 24
+        val minutes = totalMinutes % 60
+
+        return if (is24Hour) {
+            String.format(Locale.US, "%02d:%02d", hours24, minutes)
+        } else {
+            val hours12 = when {
+                hours24 == 0 -> 12
+                hours24 > 12 -> hours24 - 12
+                else -> hours24
+            }
+            val amPm = if (hours24 < 12) {
+                if (isArabic) "ص" else "AM"
+            } else {
+                if (isArabic) "م" else "PM"
+            }
+            String.format(Locale.US, "%02d:%02d %s", hours12, minutes, amPm)
+        }
     }
 
     /**

@@ -25,16 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.CompassCalibration
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -48,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -61,12 +56,13 @@ import com.example.R
 import com.example.ui.components.AlignmentStatusBanner
 import com.example.ui.components.CalibrationModal
 import com.example.ui.components.CitySelectorModal
-import com.example.ui.components.CompassMetricsRow
-import com.example.ui.components.GeometricDegreeHeading
+import com.example.ui.components.DigitalTasbihModal
 import com.example.ui.components.GeometricLocationCard
 import com.example.ui.components.GeometricNextPrayerCard
+import com.example.ui.components.LanguageSelectionPopup
 import com.example.ui.components.NearbyMosquesModal
 import com.example.ui.components.PrayerTimesSheet
+import com.example.ui.components.QiblaBearingAndDistanceHeader
 import com.example.ui.components.QiblaCompassDial
 import com.example.ui.components.SettingsModal
 import com.example.ui.i18n.AppStr
@@ -130,7 +126,7 @@ fun QiblaFinderScreen(
                 onQiblaClick = { /* Already on Qibla */ },
                 onPrayersClick = { viewModel.togglePrayerTimes(true) },
                 onNearbyClick = { viewModel.toggleNearbyMosques(true) },
-                onCalibrationClick = { viewModel.toggleCalibrationDialog(true) },
+                onTasbihClick = { viewModel.toggleTasbih(true) },
                 onSettingsClick = { viewModel.toggleSettings(true) }
             )
         }
@@ -143,11 +139,11 @@ fun QiblaFinderScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Bar (64px height)
+            // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
+                    .height(60.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -172,53 +168,27 @@ fun QiblaFinderScreen(
                     Text(
                         text = AppStr.appTitle,
                         fontSize = 22.sp,
-                        fontWeight = FontWeight.Normal,
+                        fontWeight = FontWeight.SemiBold,
                         color = GeoTextPrimary
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(
-                        onClick = { viewModel.toggleNearbyMosques(true) },
-                        modifier = Modifier.testTag("header_nearby_btn")
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_masjid),
-                            contentDescription = AppStr.navNearby,
-                            tint = GeoPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.refreshGpsLocation() },
-                        modifier = Modifier.testTag("header_gps_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MyLocation,
-                            contentDescription = AppStr.useCurrentGps,
-                            tint = GeoTextPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.toggleSettings(true) },
-                        modifier = Modifier.testTag("header_more_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = AppStr.settingsTitle,
-                            tint = GeoTextPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = { viewModel.refreshGpsLocation() },
+                    modifier = Modifier.testTag("header_gps_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = AppStr.useCurrentGps,
+                        tint = GeoPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Central Geometric Compass Dial (Option 1: Target on Ring with Independent Guidance Pointer)
+            // Central Geometric Compass Dial with heading badge placed outside
             QiblaCompassDial(
                 compass = uiState.compass,
                 qibla = uiState.qibla,
@@ -227,51 +197,48 @@ fun QiblaFinderScreen(
                 dialRotationMode = uiState.preferences.dialRotationMode,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Geometric Degree Heading (e.g. 292° NORTHWEST • MAKKAH)
-            GeometricDegreeHeading(
-                qibla = uiState.qibla,
-                compass = uiState.compass
+                    .padding(horizontal = 8.dp)
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Alignment Status Banner
-            AlignmentStatusBanner(
+            // Qibla Bearing and Distance placed together under the dial
+            QiblaBearingAndDistanceHeader(
                 qibla = uiState.qibla,
-                compass = uiState.compass,
-                statusMessage = uiState.statusMessage
+                useKilometers = uiState.preferences.useKilometers
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Location Card (South Kensington, London, UK • High Precision)
-            GeometricLocationCard(
-                location = uiState.location,
-                accuracy = uiState.compass.accuracy,
-                onLocationClick = { viewModel.toggleCitySelector(true) },
-                onCalibrationClick = { viewModel.toggleCalibrationDialog(true) }
-            )
+            // Target Guidance & Location placed side-by-side
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AlignmentStatusBanner(
+                    qibla = uiState.qibla,
+                    compass = uiState.compass,
+                    statusMessage = uiState.statusMessage,
+                    modifier = Modifier.weight(1f)
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                GeometricLocationCard(
+                    location = uiState.location,
+                    accuracy = uiState.compass.accuracy,
+                    onLocationClick = { viewModel.toggleCitySelector(true) },
+                    onCalibrationClick = { viewModel.toggleCalibrationDialog(true) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-            // Next Prayer Card (Next Prayer: Asr at 15:42 • In 1h 24m)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Next Prayer Card
             GeometricNextPrayerCard(
                 prayerSchedule = uiState.prayerSchedule,
                 onPrayerClick = { viewModel.togglePrayerTimes(true) }
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Compass Metrics Row (Bearing, Heading, Distance)
-            CompassMetricsRow(
-                qibla = uiState.qibla,
-                compass = uiState.compass,
-                useKilometers = uiState.preferences.useKilometers
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -279,6 +246,12 @@ fun QiblaFinderScreen(
     }
 
     // Modal Sheets and Dialogs
+    if (uiState.showLanguagePrompt) {
+        LanguageSelectionPopup(
+            onSelectLanguage = { viewModel.selectInitialLanguage(it) }
+        )
+    }
+
     if (uiState.showPrayerTimes) {
         PrayerTimesSheet(
             prayerSchedule = uiState.prayerSchedule,
@@ -296,6 +269,13 @@ fun QiblaFinderScreen(
             useKilometers = uiState.preferences.useKilometers,
             language = uiState.preferences.language,
             onDismiss = { viewModel.toggleNearbyMosques(false) }
+        )
+    }
+
+    if (uiState.showTasbih) {
+        DigitalTasbihModal(
+            language = uiState.preferences.language,
+            onDismiss = { viewModel.toggleTasbih(false) }
         )
     }
 
@@ -325,10 +305,15 @@ fun QiblaFinderScreen(
             onToggleSound = { viewModel.setSoundEnabled(it) },
             onToggleDialMode = { viewModel.setDialRotationMode(it) },
             onToggleUnits = { viewModel.setUseKilometers(it) },
+            onToggleClockFormat = { viewModel.setUse24HourFormat(it) },
             onToggleAutoDetectMethod = { viewModel.setAutoDetectCalculationMethod(it) },
             onSelectCalculationMethod = { viewModel.setCalculationMethod(it) },
             onSelectTheme = { viewModel.setTheme(it) },
             onSelectLanguage = { viewModel.setLanguage(it) },
+            onCalibrateClick = {
+                viewModel.toggleSettings(false)
+                viewModel.toggleCalibrationDialog(true)
+            },
             onDismiss = { viewModel.toggleSettings(false) }
         )
     }
@@ -339,7 +324,7 @@ private fun GeometricBottomNavBar(
     onQiblaClick: () -> Unit,
     onPrayersClick: () -> Unit,
     onNearbyClick: () -> Unit,
-    onCalibrationClick: () -> Unit,
+    onTasbihClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -376,10 +361,10 @@ private fun GeometricBottomNavBar(
                 onClick = onNearbyClick
             )
             NavItem(
-                painter = rememberVectorPainter(Icons.Outlined.CompassCalibration),
-                label = AppStr.navCalibrate,
+                painter = rememberVectorPainter(Icons.Outlined.TouchApp),
+                label = AppStr.navTasbih,
                 isSelected = false,
-                onClick = onCalibrationClick
+                onClick = onTasbihClick
             )
             NavItem(
                 painter = rememberVectorPainter(Icons.Outlined.Settings),

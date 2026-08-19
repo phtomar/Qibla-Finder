@@ -111,5 +111,20 @@ class ExampleRobolectricTest {
       assertEquals(themeId.isDark, palette.isDark)
     }
   }
+
+  @Test
+  fun `verify Language and Preferences persistence`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val prefsManager = com.example.data.PreferencesManager(context)
+
+    // Save Arabic language and dark theme
+    prefsManager.saveLanguage(com.example.model.AppLanguage.ARABIC)
+    prefsManager.saveTheme(com.example.model.AppThemeId.MIDNIGHT_KAABA)
+
+    // Reload preferences
+    val loaded = prefsManager.loadPreferences()
+    assertEquals(com.example.model.AppLanguage.ARABIC, loaded.language)
+    assertEquals(com.example.model.AppThemeId.MIDNIGHT_KAABA, loaded.themeId)
+  }
 }
 

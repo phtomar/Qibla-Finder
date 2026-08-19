@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material3.Card
@@ -31,22 +30,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.model.CompassReading
 import com.example.model.LocationData
 import com.example.model.PrayerSchedule
 import com.example.model.QiblaInfo
 import com.example.model.SensorAccuracy
 import com.example.ui.i18n.AppStr
+import com.example.ui.theme.GeoBorderSubtle
 import com.example.ui.theme.GeoContainer
 import com.example.ui.theme.GeoContainerHigh
 import com.example.ui.theme.GeoOnContainerHigh
@@ -62,42 +65,111 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun GeometricDegreeHeading(
+fun QiblaBearingAndDistanceHeader(
     qibla: QiblaInfo,
-    compass: CompassReading,
+    useKilometers: Boolean,
     modifier: Modifier = Modifier
 ) {
     val qiblaDirection = QiblaMath.getCardinalDirection(qibla.qiblaBearing)
-    val angleDisplay = qibla.qiblaBearing.roundToInt()
+    val distance = if (useKilometers) {
+        String.format(Locale.getDefault(), "%,.0f km", qibla.distanceKm)
+    } else {
+        String.format(Locale.getDefault(), "%,.0f mi", qibla.distanceMiles)
+    }
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Large Light Typography (e.g. 292°)
-        Text(
-            text = buildAnnotatedString {
-                append("$angleDisplay")
-                withStyle(style = SpanStyle(color = GeoPrimary, fontWeight = FontWeight.Normal)) {
-                    append("°")
+        // Qibla Bearing Pill
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(GeoSurfaceVariant)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .testTag("under_dial_qibla_bearing")
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(GeoContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Explore,
+                        contentDescription = null,
+                        tint = GeoPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-            },
-            fontSize = 46.sp,
-            fontWeight = FontWeight.Light,
-            color = GeoTextPrimary,
-            letterSpacing = (-1).sp
-        )
+                Column {
+                    Text(
+                        text = AppStr.qiblaBearing,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = GeoTextSecondary
+                    )
+                    Text(
+                        text = String.format(Locale.getDefault(), "%.1f° %s", qibla.qiblaBearing, qiblaDirection),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GeoPrimary
+                    )
+                }
+            }
+        }
 
-        Spacer(modifier = Modifier.height(2.dp))
-
-        // Subtitle: e.g. NORTHWEST • MAKKAH
-        Text(
-            text = "${qiblaDirection.uppercase()} • ${AppStr.makkah}",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = GeoTextSecondary,
-            letterSpacing = 1.2.sp
-        )
+        // Distance Pill with Custom Road to Kaaba Icon
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(GeoSurfaceVariant)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .testTag("under_dial_distance")
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(GeoContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_road_to_kaaba),
+                        contentDescription = AppStr.distance,
+                        tint = GeoPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = AppStr.distance,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = GeoTextSecondary
+                    )
+                    Text(
+                        text = distance,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GeoTextPrimary
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -122,70 +194,84 @@ fun AlignmentStatusBanner(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
             .testTag("alignment_status_banner"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isAligned) 2.dp else 0.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(if (isAligned) GeoPrimary else GeoContainer),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = when {
-                        isAligned -> Icons.Default.CheckCircle
-                        !isLevel -> Icons.Default.Warning
-                        qibla.relativeAngle > 0 -> Icons.Default.Navigation
-                        else -> Icons.Outlined.NearMe
-                    },
-                    contentDescription = null,
-                    tint = if (isAligned) Color.White else GeoPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (isAligned) GeoPrimary else GeoContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val arrowRotation = when {
+                        qibla.relativeAngle > 0 -> 45f
+                        qibla.relativeAngle < 0 -> -45f
+                        else -> 0f
+                    }
+                    Icon(
+                        imageVector = when {
+                            isAligned -> Icons.Default.CheckCircle
+                            !isLevel -> Icons.Default.Warning
+                            else -> Icons.Default.Navigation
+                        },
+                        contentDescription = null,
+                        tint = if (isAligned) Color.White else GeoPrimary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .rotate(if (!isAligned && isLevel) arrowRotation else 0f)
+                    )
+                }
+
+                if (!isAligned && isLevel) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(1.dp, RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GeoSurface)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "${abs(qibla.relativeAngle).roundToInt()}°",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GeoPrimary
+                        )
+                    }
+                }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = if (isAligned) AppStr.qiblaAligned else if (!isLevel) AppStr.deviceTilted else AppStr.turnPhone,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
-                    color = if (isAligned) GeoOnContainerHigh else GeoTextSecondary
+                    letterSpacing = 0.5.sp,
+                    color = if (isAligned) GeoOnContainerHigh else GeoTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = statusMessage,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (isAligned) GeoOnContainerHigh else GeoTextPrimary
+                    color = if (isAligned) GeoOnContainerHigh else GeoTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
-
-            if (!isAligned && isLevel) {
-                Box(
-                    modifier = Modifier
-                        .shadow(1.dp, RoundedCornerShape(12.dp))
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(GeoSurface)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "${abs(qibla.relativeAngle).roundToInt()}°",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GeoPrimary
-                    )
-                }
             }
         }
     }
@@ -201,28 +287,26 @@ fun GeometricLocationCard(
 ) {
     Card(
         modifier = modifier
-            .fillMaxWidth()
             .clickable { onLocationClick() }
             .testTag("location_card"),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = GeoSurfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.weight(1f)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(GeoContainer),
                     contentAlignment = Alignment.Center
@@ -231,49 +315,51 @@ fun GeometricLocationCard(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = null,
                         tint = GeoTextPrimary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
-                Column {
+                // Precision Pill
+                Box(
+                    modifier = Modifier
+                        .shadow(1.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(GeoSurface)
+                        .clickable { onCalibrationClick() }
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .testTag("precision_pill")
+                ) {
+                    val accLabel = when (accuracy) {
+                        SensorAccuracy.HIGH -> AppStr.accuracyHigh
+                        SensorAccuracy.MEDIUM -> AppStr.accuracyMedium
+                        SensorAccuracy.LOW -> AppStr.accuracyLow
+                        SensorAccuracy.UNRELIABLE -> AppStr.accuracyUnreliable
+                    }
                     Text(
-                        text = location.cityName,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = GeoTextPrimary,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = "${location.countryName} • ${String.format(Locale.getDefault(), "%.2f° N", location.latitude)}",
-                        fontSize = 12.sp,
-                        color = GeoTextSecondary,
-                        maxLines = 1
+                        text = accLabel.uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.4.sp,
+                        color = if (accuracy == SensorAccuracy.HIGH) GeoPrimary else GeoWarning
                     )
                 }
             }
 
-            // High Precision Pill
-            Box(
-                modifier = Modifier
-                    .shadow(1.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(GeoSurface)
-                    .clickable { onCalibrationClick() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .testTag("precision_pill")
-            ) {
-                val accLabel = when (accuracy) {
-                    SensorAccuracy.HIGH -> AppStr.accuracyHigh
-                    SensorAccuracy.MEDIUM -> AppStr.accuracyMedium
-                    SensorAccuracy.LOW -> AppStr.accuracyLow
-                    SensorAccuracy.UNRELIABLE -> AppStr.accuracyUnreliable
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = accLabel.uppercase(),
+                    text = location.cityName,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GeoTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (location.countryName.isNotEmpty()) location.countryName else String.format(Locale.getDefault(), "%.2f° N", location.latitude),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    color = if (accuracy == SensorAccuracy.HIGH) GeoPrimary else GeoWarning
+                    color = GeoTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -291,7 +377,7 @@ fun GeometricNextPrayerCard(
             .fillMaxWidth()
             .clickable { onPrayerClick() }
             .testTag("next_prayer_card"),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = GeoContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -340,112 +426,6 @@ fun GeometricNextPrayerCard(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = GeoOnContainerHigh
-            )
-        }
-    }
-}
-
-@Composable
-fun CompassMetricsRow(
-    qibla: QiblaInfo,
-    compass: CompassReading,
-    useKilometers: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val distance = if (useKilometers) {
-        String.format(Locale.getDefault(), "%,.0f km", qibla.distanceKm)
-    } else {
-        String.format(Locale.getDefault(), "%,.0f mi", qibla.distanceMiles)
-    }
-
-    val qiblaDirection = QiblaMath.getCardinalDirection(qibla.qiblaBearing)
-    val currentHeadingDirection = QiblaMath.getCardinalDirection(compass.azimuth.toDouble())
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        GeometricMetricPill(
-            title = AppStr.qiblaBearing,
-            value = String.format(Locale.getDefault(), "%.1f°", qibla.qiblaBearing),
-            subtext = qiblaDirection,
-            icon = Icons.Default.Explore,
-            highlight = true,
-            modifier = Modifier.weight(1f)
-        )
-        GeometricMetricPill(
-            title = AppStr.heading,
-            value = String.format(Locale.getDefault(), "%.0f°", compass.azimuth),
-            subtext = currentHeadingDirection,
-            icon = Icons.Default.Navigation,
-            highlight = false,
-            modifier = Modifier.weight(1f)
-        )
-        GeometricMetricPill(
-            title = AppStr.distance,
-            value = distance,
-            subtext = AppStr.toMakkah,
-            icon = Icons.Default.Place,
-            highlight = false,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun GeometricMetricPill(
-    title: String,
-    value: String,
-    subtext: String,
-    icon: ImageVector,
-    highlight: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (highlight) GeoContainer else GeoSurfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (highlight) GeoPrimary else GeoTextSecondary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = title,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (highlight) GeoPrimary else GeoTextSecondary,
-                    maxLines = 1
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = GeoTextPrimary,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(1.dp))
-            Text(
-                text = subtext,
-                fontSize = 10.sp,
-                color = GeoTextSecondary,
-                maxLines = 1
             )
         }
     }
