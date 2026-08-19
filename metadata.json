@@ -1,0 +1,6 @@
+{
+  "name": "Qibla Finder",
+  "description": "Accurate Qibla compass using device motion and magnetic sensors to point directly towards the Kaaba in Mecca with declination correction, sensor calibration, tilt leveling, prayer times, and distance tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
