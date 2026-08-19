@@ -19,7 +19,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,7 @@ import com.example.model.CompassReading
 import com.example.model.QiblaInfo
 import com.example.ui.theme.AppThemePalette
 import com.example.ui.theme.LocalAppTheme
+import com.example.util.QiblaMath
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -51,10 +56,56 @@ import kotlin.math.sin
 fun QiblaCompassDial(
     compass: CompassReading,
     qibla: QiblaInfo,
+    useTrueNorth: Boolean,
+    declination: Float,
     dialRotationMode: Boolean,
     modifier: Modifier = Modifier
 ) {
     val theme = LocalAppTheme.current
+
+    // Calculate the actual effective heading (True Heading or Magnetic Heading)
+    val effectiveHeading = if (useTrueNorth) {
+        QiblaMath.normalize360(compass.azimuth + declination)
+    } else {
+        compass.azimuth
+    }
+
+    // Unwrapped continuous angle tracking to eliminate 0/360 wrap-around spins
+    var continuousHeading by remember { mutableFloatStateOf(effectiveHeading) }
+    var lastRawHeading by remember { mutableFloatStateOf(effectiveHeading) }
+
+    LaunchedEffect(effectiveHeading) {
+        var diff = effectiveHeading - lastRawHeading
+        while (diff > 180f) diff -= 360f
+        while (diff < -180f) diff += 360f
+        continuousHeading += diff
+        lastRawHeading = effectiveHeading
+    }
+
+    var continuousQiblaBearing by remember { mutableFloatStateOf(qibla.qiblaBearing.toFloat()) }
+    var lastRawBearing by remember { mutableFloatStateOf(qibla.qiblaBearing.toFloat()) }
+
+    LaunchedEffect(qibla.qiblaBearing) {
+        val raw = qibla.qiblaBearing.toFloat()
+        var diff = raw - lastRawBearing
+        while (diff > 180f) diff -= 360f
+        while (diff < -180f) diff += 360f
+        continuousQiblaBearing += diff
+        lastRawBearing = raw
+    }
+
+    // Smooth spring animations without jitter or sudden spins
+    val animatedHeading by animateFloatAsState(
+        targetValue = continuousHeading,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 420f),
+        label = "heading_anim"
+    )
+
+    val animatedQiblaBearing by animateFloatAsState(
+        targetValue = continuousQiblaBearing,
+        animationSpec = spring(dampingRatio = 0.88f, stiffness = 380f),
+        label = "qibla_bearing_anim"
+    )
 
     // Pulse animation when aligned with Kaaba
     val infiniteTransition = rememberInfiniteTransition(label = "geo_pulse")
@@ -66,25 +117,6 @@ fun QiblaCompassDial(
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
-    )
-
-    // Animated dial rotation (Compass heading)
-    val animatedAzimuth by animateFloatAsState(
-        targetValue = compass.azimuth,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
-        label = "azimuth_anim"
-    )
-
-    val animatedQiblaBearing by animateFloatAsState(
-        targetValue = qibla.qiblaBearing.toFloat(),
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
-        label = "qibla_bearing_anim"
-    )
-
-    val animatedRelativeAngle by animateFloatAsState(
-        targetValue = qibla.relativeAngle,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f),
-        label = "relative_angle_anim"
     )
 
     Box(
@@ -141,14 +173,22 @@ fun QiblaCompassDial(
 
             if (dialRotationMode) {
                 // =========================================================================
-                // ROTATING DIAL MODE (Compass Rose rotates with heading, Kaaba is on rose)
+                // ROTATING DIAL MODE (Standard Qibla navigation)
+                // Compass Rose rotates with effective device heading.
+                // Both the Kaaba Badge and the Needle are placed at exact same animatedQiblaBearing.
+                // This guarantees ZERO OFFSET between the needle and the Kaaba badge.
                 // =========================================================================
-                rotate(-animatedAzimuth, pivot = center) {
+                rotate(-animatedHeading, pivot = center) {
                     // Rose ticks and N, E, S, W
                     drawDegreeTicks(center, ringRadius, theme)
                     drawGeometricCardinals(center, ringRadius, theme)
 
-                    // Destination: Kaaba Marker fixed on the compass ring at its geographical azimuth
+                    // Guidance needle extending from center directly toward the Kaaba badge
+                    rotate(animatedQiblaBearing, pivot = center) {
+                        drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
+                    }
+
+                    // Destination: Kaaba Marker badge at exact same azimuth on the ring
                     drawKaabaMarkerBadge(
                         center = center,
                         ringRadius = ringRadius,
@@ -159,22 +199,24 @@ fun QiblaCompassDial(
                     )
                 }
 
-                // Top fixed heading indicator (phone forward direction)
+                // Top fixed heading indicator (phone forward direction at 12 o'clock)
                 drawTopIndicator(center, ringRadius, qibla.isAligned, theme)
-
-                // Independent Guidance Needle pointing from center towards the Kaaba
-                rotate(animatedRelativeAngle, pivot = center) {
-                    drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
-                }
             } else {
                 // =========================================================================
-                // FIXED DIAL MODE (Option 1: North fixed at top, Kaaba on ring, needle rotates)
+                // FIXED DIAL MODE
+                // Compass Rose is fixed with North at 12 o'clock; Kaaba is at its geographic azimuth.
+                // Guidance needle points directly at Kaaba badge at animatedQiblaBearing.
                 // =========================================================================
-                // 1. Compass Rose (Fixed: N at 12 o'clock, E at 3 o'clock, etc.)
+                // 1. Compass Rose (Fixed: N at 12 o'clock, E at 3 o'clock, S at 6 o'clock, W at 9 o'clock)
                 drawDegreeTicks(center, ringRadius, theme)
                 drawGeometricCardinals(center, ringRadius, theme)
 
-                // 2. Kaaba Marker on the ring at its exact geographic azimuth (e.g. 135° SE)
+                // 2. Guidance Needle pointing directly at Kaaba badge
+                rotate(animatedQiblaBearing, pivot = center) {
+                    drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
+                }
+
+                // 3. Kaaba Marker on the ring at its exact geographic azimuth
                 drawKaabaMarkerBadge(
                     center = center,
                     ringRadius = ringRadius,
@@ -184,16 +226,8 @@ fun QiblaCompassDial(
                     theme = theme
                 )
 
-                // 3. Magnetic North Pointer Needle (Shows where true/magnetic North is relative to phone)
-                rotate(-animatedAzimuth, pivot = center) {
-                    drawNorthIndicator(center, ringRadius, theme)
-                }
-
-                // 4. Independent Qibla Pointer Needle (Sweeps dynamically toward the Kaaba marker on the ring)
-                // When phone faces Kaaba, relativeAngle == 0, pointer points straight up into the aligned state!
-                rotate(animatedRelativeAngle, pivot = center) {
-                    drawPointerNeedle(center, ringRadius, qibla.isAligned, theme)
-                }
+                // 4. Pointer indicator showing device forward heading around fixed rose
+                drawPhoneHeadingPointer(center, ringRadius, animatedHeading, qibla.isAligned, theme)
             }
 
             // 4. Central Hub with Inclinometer / Spirit Level Bubble
@@ -343,7 +377,7 @@ private fun DrawScope.drawKaabaMarkerBadge(
         )
     }
 
-    // Subtle connector dot to outer dial
+    // Connector ring to dial
     drawCircle(
         color = if (isAligned) theme.primary else theme.border,
         radius = badgeRadius + 2.dp.toPx(),
@@ -425,8 +459,26 @@ private fun DrawScope.drawTopIndicator(
     )
 }
 
+private fun DrawScope.drawPhoneHeadingPointer(
+    center: Offset,
+    ringRadius: Float,
+    headingDeg: Float,
+    isAligned: Boolean,
+    theme: AppThemePalette
+) {
+    val angleRad = Math.toRadians(headingDeg.toDouble() - 90.0)
+    val markerX = center.x + ringRadius * cos(angleRad).toFloat()
+    val markerY = center.y + ringRadius * sin(angleRad).toFloat()
+
+    drawCircle(
+        color = if (isAligned) theme.primary else theme.secondary,
+        radius = 5.dp.toPx(),
+        center = Offset(markerX, markerY)
+    )
+}
+
 /**
- * Draws the independent pointing needle/arm that guides the user towards the Kaaba.
+ * Draws the guidance pointer needle aiming directly towards the Kaaba marker badge.
  */
 private fun DrawScope.drawPointerNeedle(
     center: Offset,
@@ -438,7 +490,7 @@ private fun DrawScope.drawPointerNeedle(
     val needleBaseWidth = 6.dp.toPx()
     val needleTipY = center.y - needleLen
 
-    // Tapered Arrowhead Path
+    // Tapered Arrowhead Path pointing directly forward
     val arrowPath = Path().apply {
         moveTo(center.x, needleTipY)
         lineTo(center.x - needleBaseWidth, center.y - needleLen * 0.65f)
@@ -448,7 +500,7 @@ private fun DrawScope.drawPointerNeedle(
         close()
     }
 
-    // Shadow / glow behind arrow
+    // Shadow / glow behind arrow when aligned
     if (isAligned) {
         drawPath(
             path = arrowPath,
@@ -472,7 +524,7 @@ private fun DrawScope.drawPointerNeedle(
         style = Fill
     )
 
-    // Needle crisp border
+    // Needle border
     drawPath(
         path = arrowPath,
         color = if (isAligned) Color.White else theme.borderSubtle,
@@ -489,27 +541,6 @@ private fun DrawScope.drawPointerNeedle(
     )
 }
 
-/**
- * Draws the North needle pointing towards magnetic / true north.
- */
-private fun DrawScope.drawNorthIndicator(center: Offset, ringRadius: Float, theme: AppThemePalette) {
-    val needleLen = ringRadius * 0.55f
-    val halfWidth = 3.5.dp.toPx()
-
-    val path = Path().apply {
-        moveTo(center.x, center.y - needleLen)
-        lineTo(center.x - halfWidth, center.y - 14.dp.toPx())
-        lineTo(center.x + halfWidth, center.y - 14.dp.toPx())
-        close()
-    }
-
-    drawPath(
-        path = path,
-        color = theme.north.copy(alpha = 0.85f),
-        style = Fill
-    )
-}
-
 private fun DrawScope.drawGeometricCenterHub(
     center: Offset,
     pitch: Float,
@@ -520,7 +551,7 @@ private fun DrawScope.drawGeometricCenterHub(
 ) {
     val hubRadius = 18.dp.toPx()
 
-    // Outer white rim
+    // Outer rim
     drawCircle(
         color = if (theme.isDark) theme.surfaceVariant else Color.White,
         radius = hubRadius,

@@ -222,6 +222,8 @@ fun QiblaFinderScreen(
             QiblaCompassDial(
                 compass = uiState.compass,
                 qibla = uiState.qibla,
+                useTrueNorth = uiState.preferences.useTrueNorth,
+                declination = uiState.location.magneticDeclination,
                 dialRotationMode = uiState.preferences.dialRotationMode,
                 modifier = Modifier
                     .fillMaxWidth()

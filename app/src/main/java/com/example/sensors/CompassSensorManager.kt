@@ -51,6 +51,7 @@ class CompassSensorManager(private val context: Context) {
         var smoothedAzimuthCos = 1.0
         var smoothedPitch = 0f
         var smoothedRoll = 0f
+        var isFirstSample = true
         var currentAccuracy = SensorAccuracy.HIGH
         val alpha = 0.15f // Smoothing factor
 
@@ -126,12 +127,19 @@ class CompassSensorManager(private val context: Context) {
 
                     // Circular exponential moving average for smooth needle motion
                     val rad = Math.toRadians(rawAzimuthDeg)
-                    smoothedAzimuthSin = smoothedAzimuthSin * (1.0 - alpha) + sin(rad) * alpha
-                    smoothedAzimuthCos = smoothedAzimuthCos * (1.0 - alpha) + cos(rad) * alpha
+                    if (isFirstSample) {
+                        smoothedAzimuthSin = sin(rad)
+                        smoothedAzimuthCos = cos(rad)
+                        smoothedPitch = rawPitchDeg
+                        smoothedRoll = rawRollDeg
+                        isFirstSample = false
+                    } else {
+                        smoothedAzimuthSin = smoothedAzimuthSin * (1.0 - alpha) + sin(rad) * alpha
+                        smoothedAzimuthCos = smoothedAzimuthCos * (1.0 - alpha) + cos(rad) * alpha
+                        smoothedPitch = smoothedPitch * (1f - alpha) + rawPitchDeg * alpha
+                        smoothedRoll = smoothedRoll * (1f - alpha) + rawRollDeg * alpha
+                    }
                     val smoothAzimuth = (Math.toDegrees(atan2(smoothedAzimuthSin, smoothedAzimuthCos)) + 360.0) % 360.0
-
-                    smoothedPitch = smoothedPitch * (1f - alpha) + rawPitchDeg * alpha
-                    smoothedRoll = smoothedRoll * (1f - alpha) + rawRollDeg * alpha
 
                     val isLevel = abs(smoothedPitch) < 18f && abs(smoothedRoll) < 18f
 
